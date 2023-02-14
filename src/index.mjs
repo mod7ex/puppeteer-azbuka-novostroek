@@ -10,6 +10,14 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const log = console.log;
 
+const log_block = (...args) => {
+  log("////////////////////////////////////////////////////////////////////////////////////////////////////");
+  log("////////////////////////////////////////////////////////////////////////////////////////////////////");
+  log("//////////", ...args);
+  log("////////////////////////////////////////////////////////////////////////////////////////////////////");
+  log("////////////////////////////////////////////////////////////////////////////////////////////////////\n");
+};
+
 const TARGET = "https://crm.metriks.ru/shahmatki/agent";
 
 const TIMEOUT = 1000 * 60;
@@ -56,10 +64,10 @@ const run = async () => {
   for (let { name: complex_name, buildings_details } of complexes_meta) {
     const _buildings = [];
 
-    log("[Working on complex] %s", complex_name);
+    log_block("[Working on complex] %s", complex_name);
 
     for (let { link, name } of buildings_details) {
-      log("[Working building] in %s", name);
+      log_block("[Working building] in %s", name);
 
       await page.goto(link);
 
@@ -116,9 +124,7 @@ const run = async () => {
               log("Apartment %s extracted", flat.apartment);
             } catch (error) {
               log("Could not work on apartment %s", apartment_link);
-              log("///////////////////////////////////////////////////////////////////");
-              log("[ERROR]: ", error?.message);
-              log("///////////////////////////////////////////////////////////////////\n");
+              log_block("[ERROR]: ", error?.message);
               continue;
             } finally {
               await page.click(".edit__close");
@@ -126,9 +132,7 @@ const run = async () => {
           }
         } catch (error) {
           log("Could not work on entrance %s", _selector);
-          log("///////////////////////////////////////////////////////////////////");
-          log("[ERROR]: ", error?.message);
-          log("///////////////////////////////////////////////////////////////////\n");
+          log_block("[ERROR]: ", error?.message);
           continue;
         }
       }
@@ -153,9 +157,7 @@ const run = async () => {
       },
     });
 
-    log("//////////////////////////////////////////////////");
-    log("[Working On Complex Finished] %s", complex_name);
-    log("//////////////////////////////////////////////////");
+    log_block("[Working On Complex Finished] %s", complex_name);
   }
 
   await browser.close();
