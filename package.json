@@ -1,18 +1,11 @@
 {
-  "name": "parsers",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
   "scripts": {
     "start": "rm -rf xml && mkdir xml && node src/index.mjs"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "dependencies": {
-    "crypto-js": "^4.1.1",
     "cyrillic-to-translit-js": "^3.2.1",
     "puppeteer": "^19.7.0",
+    "crypto-js": "^4.1.1",
     "xml-js": "^1.6.11"
   }
 }

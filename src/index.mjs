@@ -11,16 +11,51 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const log = console.log;
 
 const log_block = (...args) => {
-  log("////////////////////////////////////////////////////////////////////////////////////////////////////");
-  log("////////////////////////////////////////////////////////////////////////////////////////////////////");
-  log("//////////", ...args);
-  log("////////////////////////////////////////////////////////////////////////////////////////////////////");
-  log("////////////////////////////////////////////////////////////////////////////////////////////////////\n");
+  log(".................................................................................................../");
+  log(".................................................................................................../");
+  log("..........", ...args);
+  log(".................................................................................................../");
+  log(".................................................................................................../\n");
 };
 
 const TARGET = "https://crm.metriks.ru/shahmatki/agent";
 
-const APARTMENT_END_POINT = "https://crm.metriks.ru/local/components/itiso/shahmatki.lists/ajax.php";
+const exploit = (v) => {
+  return new Promise((resolve) => {
+    const form = document.createElement("form");
+    const id_el = document.createElement("input");
+    const action_el = document.createElement("input");
+    form.method = "POST";
+    form.action = "/local/components/itiso/shahmatki.lists/ajax.php";
+    id_el.value = v;
+    id_el.name = "id";
+    form.appendChild(id_el);
+    action_el.value = "getObjectById";
+    action_el.name = "action";
+    form.appendChild(action_el);
+
+    var xhttp = new XMLHttpRequest();
+
+    xhttp.open("POST", "/local/components/itiso/shahmatki.lists/ajax.php");
+
+    xhttp.onreadystatechange = function () {
+      if (this.readyState == 4 && this.status == 200) resolve(xhttp.responseText);
+    };
+
+    xhttp.send(new FormData(form));
+  });
+};
+
+const getApartmentData = (payload) => {
+  return {
+    is_apartment: payload?.TYPETEXT === "Квартира",
+    apartment: payload?.NUM,
+    rooms: payload?.ROOM,
+    area: payload?.AREA,
+    plan: new URL(payload?.LAYOUT?.ORIGINAL_SRC, "https://crm.metriks.ru").href,
+    price: payload?.PRICE,
+  };
+};
 
 const TIMEOUT = 1000 * 60;
 
@@ -37,32 +72,6 @@ const writeXML = (complexes) => {
       '<?xml version="1.0" encoding="UTF-8" ?>\n' + result,
       { flag: 'wx' }
   );
-};
-
-const getApartmentData = async (id) => {
-  const response = await fetch(APARTMENT_END_POINT, {
-    method: "POST",
-    body: JSON.stringify({
-      action: "getObjectById",
-      id: parseInt(id),
-    }),
-  });
-
-  const data = await response.json();
-
-  const apartment = data?.NUM;
-  const is_apartment = data?.TYPETEXT === "Квартира";
-  const rooms = data?.ROOM;
-  const area = data?.AREA;
-  const plan = data?.LAYOUT?.ORIGINAL_SRC;
-
-  return {
-    is_apartment,
-    apartment,
-    rooms,
-    area,
-    plan,
-  };
 };
 
 const run = async () => {
@@ -97,51 +106,34 @@ const run = async () => {
     for (let { link, name } of buildings_details) {
       log_block("[Working building] %s", name);
 
-      await page.goto(link);
+      const apartment_selector = ".chess__href:has(> .white)";
+
+      await Promise.all([page.goto(link), page.waitForSelector(apartment_selector)]);
 
       log("[LOADING BUILDING] %s", link);
 
-      const entrance_selectors = await page.evaluate(() => {
-        const _selector = ".chess__porch-item";
-        return Array.from(document.querySelectorAll(_selector)).map((e) => `${_selector}[data-id="${e.dataset.id}"]`);
+      const apartments_IDS = await page.evaluate(() => {
+        return Array.from(document.querySelectorAll(apartment_selector)).map((a) => {
+          return new URL(a.href).searchParams.get("id");
+        });
       });
+
+      /* console.log(apartments_IDS); */
+
+      await page.addScriptTag({ content: `${exploit}` }); // add the exploit function to the dom so that it can be defined when evaluating
 
       const _flats = [];
 
-      for (let _selector of entrance_selectors) {
-        try {
-          // prettier-ignore
-          /* const [response] = */ await Promise.all([
-            page.waitForNavigation({waitUntil: 'networkidle0', timeout: TIMEOUT}),
-            page.click(_selector),
-          ]);
+      for (let apartment_id of apartments_IDS) {
+        const apartment_details = await page.evaluate((t) => exploit(t), apartment_id);
 
-          const apartments_IDS = await page.evaluate(() => {
-            return Array.from(document.querySelectorAll(".chess__href:has(> .white)")).map((a) => {
-              return new URL(a.href).searchParams.get("id");
-            });
-          });
+        const flat = getApartmentData(apartment_details);
 
-          for (let apartment_id of apartments_IDS) {
-            try {
-              const flat = await getApartmentData(apartment_id);
+        if (!flat.is_apartment) continue;
 
-              if (!flat.is_apartment) continue;
+        delete flat.is_apartment;
 
-              delete flat.is_apartment;
-              _flats.push(flat);
-            } catch (error) {
-              log("Could not work on apartment ID: %s", apartment_id);
-              log_block("[ERROR]: ", error?.message);
-            }
-          }
-
-          log_block(apartments_IDS);
-        } catch (error) {
-          log("Could not work on entrance %s", _selector);
-          log_block("[ERROR]: ", error?.message);
-          continue;
-        }
+        _flats.push(flat);
       }
 
       _buildings.push({

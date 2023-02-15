@@ -3,3 +3,4 @@ xml/*
 /node_modules
 *.png
 *.jpg
+.yarn
