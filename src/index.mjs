@@ -96,7 +96,7 @@ const run = async () => {
 
             await page.waitForNavigation({ waitUntil: "networkidle0", timeout: TIMEOUT });
 
-            await sleep(1000);
+            /* await sleep(1000); */
 
             try {
               /* await page.screenshot({ path: "screen.png", fullPage: true }); */
