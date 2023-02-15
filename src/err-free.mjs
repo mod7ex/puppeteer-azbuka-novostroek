@@ -40,29 +40,46 @@ const writeXML = (complexes) => {
 };
 
 const getApartmentData = async (id) => {
-  const response = await fetch(APARTMENT_END_POINT, {
-    method: "POST",
-    body: JSON.stringify({
-      action: "getObjectById",
-      id: parseInt(id),
-    }),
-  });
+  try {
+    const response = await fetch(APARTMENT_END_POINT, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "getObjectById",
+        id: parseInt(id),
+      }),
+    });
 
-  const data = await response.json();
+    const v = await response.text();
 
-  const apartment = data?.NUM;
-  const is_apartment = data?.TYPETEXT === "Квартира";
-  const rooms = data?.ROOM;
-  const area = data?.AREA;
-  const plan = data?.LAYOUT?.ORIGINAL_SRC;
+    console.log(v);
 
-  return {
-    is_apartment,
-    apartment,
-    rooms,
-    area,
-    plan,
-  };
+    if (!response.ok) {
+      console.log("STATUS: ", response.status);
+      throw Error("Something went wrong");
+    }
+
+    const data = await response.json();
+
+    const apartment = data?.NUM;
+    const is_apartment = data?.TYPETEXT === "Квартира";
+    const rooms = data?.ROOM;
+    const area = data?.AREA;
+    const plan = data?.LAYOUT?.ORIGINAL_SRC;
+
+    return {
+      is_apartment,
+      apartment,
+      rooms,
+      area,
+      plan,
+    };
+  } catch (e) {
+    log_block(e);
+
+    return {
+      is_apartment: false,
+    };
+  }
 };
 
 const run = async () => {
@@ -109,39 +126,28 @@ const run = async () => {
       const _flats = [];
 
       for (let _selector of entrance_selectors) {
-        try {
-          // prettier-ignore
-          /* const [response] = */ await Promise.all([
+        // prettier-ignore
+        /* const [response] = */ await Promise.all([
             page.waitForNavigation({waitUntil: 'networkidle0', timeout: TIMEOUT}),
             page.click(_selector),
           ]);
 
-          const apartments_IDS = await page.evaluate(() => {
-            return Array.from(document.querySelectorAll(".chess__href:has(> .white)")).map((a) => {
-              return new URL(a.href).searchParams.get("id");
-            });
+        const apartments_IDS = await page.evaluate(() => {
+          return Array.from(document.querySelectorAll(".chess__href:has(> .white)")).map((a) => {
+            return new URL(a.href).searchParams.get("id");
           });
+        });
 
-          for (let apartment_id of apartments_IDS) {
-            try {
-              const flat = await getApartmentData(apartment_id);
+        for (let apartment_id of apartments_IDS) {
+          const flat = await getApartmentData(apartment_id);
 
-              if (!flat.is_apartment) continue;
+          if (!flat.is_apartment) continue;
 
-              delete flat.is_apartment;
-              _flats.push(flat);
-            } catch (error) {
-              log("Could not work on apartment ID: %s", apartment_id);
-              log_block("[ERROR]: ", error?.message);
-            }
-          }
-
-          log_block(apartments_IDS);
-        } catch (error) {
-          log("Could not work on entrance %s", _selector);
-          log_block("[ERROR]: ", error?.message);
-          continue;
+          delete flat.is_apartment;
+          _flats.push(flat);
         }
+
+        log_block(apartments_IDS);
       }
 
       _buildings.push({
