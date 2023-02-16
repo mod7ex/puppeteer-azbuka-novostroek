@@ -20,32 +20,6 @@ const log_block = (...args) => {
 
 const TARGET = "https://crm.metriks.ru/shahmatki/agent";
 
-const exploit = (v) => {
-  return new Promise((resolve) => {
-    const form = document.createElement("form");
-    const id_el = document.createElement("input");
-    const action_el = document.createElement("input");
-    form.method = "POST";
-    form.action = "/local/components/itiso/shahmatki.lists/ajax.php";
-    id_el.value = v;
-    id_el.name = "id";
-    form.appendChild(id_el);
-    action_el.value = "getObjectById";
-    action_el.name = "action";
-    form.appendChild(action_el);
-
-    var xhttp = new XMLHttpRequest();
-
-    xhttp.open("POST", "/local/components/itiso/shahmatki.lists/ajax.php");
-
-    xhttp.onreadystatechange = function () {
-      if (this.readyState == 4 && this.status == 200) resolve(xhttp.responseText);
-    };
-
-    xhttp.send(new FormData(form));
-  });
-};
-
 const getApartmentData = (payload) => {
   return {
     is_apartment: payload?.TYPETEXT === "Квартира",
@@ -106,34 +80,64 @@ const run = async () => {
     for (let { link, name } of buildings_details) {
       log_block("[Working building] %s", name);
 
-      const apartment_selector = ".chess__href:has(> .white)";
+      await page.goto(link);
+      const is_everything_sold = await page.evaluate(() => !document.querySelector(".chess__href:has(> .white)"));
+      /* await page.waitForSelector(".chess__href:has(> .white)", { timeout: TIMEOUT }); */
 
-      await Promise.all([page.goto(link), page.waitForSelector(apartment_selector)]);
-
-      log("[LOADING BUILDING] %s", link);
+      if (is_everything_sold) continue;
 
       const apartments_IDS = await page.evaluate(() => {
-        return Array.from(document.querySelectorAll(apartment_selector)).map((a) => {
+        return Array.from(document.querySelectorAll(".chess__href:has(> .white)")).map((a) => {
           return new URL(a.href).searchParams.get("id");
         });
       });
 
-      /* console.log(apartments_IDS); */
-
-      await page.addScriptTag({ content: `${exploit}` }); // add the exploit function to the dom so that it can be defined when evaluating
+      await page.addScriptTag({
+        content: `
+        const exploit = (v) => {
+          return new Promise((resolve) => {
+            const form = document.createElement("form");
+            const id_el = document.createElement("input");
+            const action_el = document.createElement("input");
+            form.method = "POST";
+            form.action = "/local/components/itiso/shahmatki.lists/ajax.php";
+            id_el.value = v;
+            id_el.name = "id";
+            form.appendChild(id_el);
+            action_el.value = "getObjectById";
+            action_el.name = "action";
+            form.appendChild(action_el);
+        
+            var xhttp = new XMLHttpRequest();
+        
+            xhttp.open("POST", "/local/components/itiso/shahmatki.lists/ajax.php");
+        
+            xhttp.onreadystatechange = function () {
+              if (this.readyState == 4 && this.status == 200) resolve(xhttp.responseText);
+            };
+        
+            xhttp.send(new FormData(form));
+          });
+        };
+      `,
+      }); // add the exploit function to the dom so that it can be defined when evaluating
 
       const _flats = [];
 
       for (let apartment_id of apartments_IDS) {
         const apartment_details = await page.evaluate((t) => exploit(t), apartment_id);
 
-        const flat = getApartmentData(apartment_details);
+        const flat = getApartmentData(JSON.parse(apartment_details));
+
+        console.log("[APARTMENT EXTRACTED] ID %s", apartment_id);
 
         if (!flat.is_apartment) continue;
 
         delete flat.is_apartment;
 
         _flats.push(flat);
+
+        /* await sleep(500); */
       }
 
       _buildings.push({
