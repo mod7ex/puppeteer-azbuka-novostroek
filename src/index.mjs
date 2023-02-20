@@ -27,7 +27,7 @@ const getApartmentData = (payload) => {
     rooms: payload?.ROOM,
     area: payload?.AREA,
     plan: new URL(payload?.LAYOUT?.ORIGINAL_SRC, "https://crm.metriks.ru").href,
-    price: payload?.PRICE,
+    price: payload?.PRICEALL_CLR,
   };
 };
 

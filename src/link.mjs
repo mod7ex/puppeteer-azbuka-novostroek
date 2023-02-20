@@ -23,8 +23,8 @@ const createForm = (v) => {
 };
 
 // JSON page
-const run = () => {
-  const form = createForm();
+const run = (v) => {
+  const form = createForm(v);
 
   document.body.appendChild(form);
 
